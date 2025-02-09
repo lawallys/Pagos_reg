@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Pagos</title>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .container {
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            width: 100%;
+        }
+        h1 {
+            font-size: 1.5em;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin: 10px 0 5px;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #007BFF;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            font-size: 1em;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: center;
+        }
+        th {
+            background-color: #f4f4f9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Registro de Pagos</h1>
+        <form id="paymentForm">
+            <label for="date">Fecha de Pago:</label>
+            <input type="date" id="date" required>
+
+            <label for="amount">Cantidad Pagada:</label>
+            <input type="number" id="amount" step="0.01" required>
+
+            <button type="submit">Registrar Pago</button>
+        </form>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Cantidad Pagada</th>
+                    <th>Restante</th>
+                </tr>
+            </thead>
+            <tbody id="paymentTable">
+                <tr>
+                    <td colspan="2">Saldo inicial</td>
+                    <td id="initialBalance">$40996.18</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyB5Om2ieHVXcF7Fi-TT2GpgcX7QZZsjHac",
+            authDomain: "pagosregistros-51b29.firebaseapp.com",
+            databaseURL: "https://pagosregistros-51b29-default-rtdb.firebaseio.com",
+            projectId: "pagosregistros-51b29",
+            storageBucket: "pagosregistros-51b29.firebasestorage.app",
+            messagingSenderId: "795053909397",
+            appId: "1:795053909397:web:b8ddd898e8d174e8e8c29c"
+            measurementId: "G-0Z4H2JT062"
+            
+        };
+
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const database = firebase.database(app);
+
+        let totalDebt = 40996.18;
+        const paymentForm = document.getElementById('paymentForm');
+        const paymentTable = document.getElementById('paymentTable');
+        const initialBalanceCell = document.getElementById('initialBalance');
+
+        // Load payments from Firebase
+        function loadPayments() {
+            firebase.database().ref('payments').on('value', (snapshot) => {
+                const payments = snapshot.val();
+                if (payments) {
+                    paymentTable.innerHTML = `
+                        <tr>
+                            <td colspan="2">Saldo inicial</td>
+                            <td id="initialBalance">$${totalDebt.toFixed(2)}</td>
+                        </tr>
+                    `;
+                    let remaining = totalDebt;
+                    Object.keys(payments).forEach(key => {
+                        const payment = payments[key];
+                        remaining -= payment.amount;
+                        addPaymentRow(payment.date, payment.amount, remaining);
+                    });
+                    totalDebt = remaining;
+                    updateInitialBalance();
+                }
+            });
+        }
+
+        // Save payment to Firebase
+        function savePayment(date, amount) {
+            const newPaymentKey = firebase.database().ref().child('payments').push().key;
+            const updates = {};
+            updates['/payments/' + newPaymentKey] = { date, amount };
+            firebase.database().ref().update(updates);
+        }
+
+        // Add a row to the payment table
+        function addPaymentRow(date, amount, remaining) {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${date}</td>
+                <td>$${amount.toFixed(2)}</td>
+                <td>$${remaining.toFixed(2)}</td>
+            `;
+            paymentTable.appendChild(row);
+        }
+
+        // Update the initial balance cell
+        function updateInitialBalance() {
+            initialBalanceCell.textContent = `$${totalDebt.toFixed(2)}`;
+        }
+
+        paymentForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            const date = document.getElementById('date').value;
+            const amount = parseFloat(document.getElementById('amount').value);
+
+            if (!date || isNaN(amount) || amount <= 0) {
+                alert('Por favor, introduce una fecha y cantidad válida.');
+                return;
+            }
+
+            if (amount > totalDebt) {
+                alert('El monto ingresado excede el saldo restante.');
+                return;
+            }
+
+            savePayment(date, amount);
+            paymentForm.reset();
+        });
+
+        // Initialize the page
+        loadPayments();
+    </script>
+</body>
+</html>
